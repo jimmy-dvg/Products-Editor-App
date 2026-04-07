@@ -9,6 +9,7 @@ import { ProductEditorHero } from './ProductEditorHero'
 import { ProductListToolbar } from './ProductListToolbar'
 import { fileToDataUrl } from '../lib/fileToDataUrl'
 import { loadProducts, saveProducts } from '../lib/productsStorage'
+import { searchProducts } from '../lib/searchProducts'
 import type { Product, ProductFormValues } from '../types/product'
 import { createEmptyProductFormValues } from '../types/product'
 
@@ -77,24 +78,7 @@ export function ProductEditorApp() {
     return products.reduce((total, product) => total + product.price, 0) / products.length
   }, [products])
 
-  const filteredProducts = useMemo(
-    () =>
-      products.filter((product) => {
-        const query = search.trim().toLowerCase()
-
-        if (!query) {
-          return true
-        }
-
-        return (
-          product.name.toLowerCase().includes(query) ||
-          product.description.toLowerCase().includes(query) ||
-          product.unit.toLowerCase().includes(query) ||
-          product.currency.toLowerCase().includes(query)
-        )
-      }),
-    [products, search],
-  )
+  const filteredProducts = useMemo(() => searchProducts(products, search), [products, search])
 
   const openAddDialog = () => {
     setFormValues(createEmptyProductFormValues())
