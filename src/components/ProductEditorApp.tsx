@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { FiCheckCircle, FiEdit3, FiImage, FiPackage, FiPlus, FiSearch } from 'react-icons/fi'
+import { FiImage } from 'react-icons/fi'
 import { ProductCard } from './ProductCard'
 import { ProductFormDialog } from './ProductFormDialog'
 import { ConfirmDeleteDialog } from './ConfirmDeleteDialog'
+import { ProductEditorHero } from './ProductEditorHero'
+import { ProductListToolbar } from './ProductListToolbar'
 import { fileToDataUrl } from '../lib/fileToDataUrl'
 import { loadProducts, saveProducts } from '../lib/productsStorage'
 import type { Product, ProductFormValues } from '../types/product'
@@ -187,24 +189,7 @@ export function ProductEditorApp() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <div className="d-flex flex-column flex-lg-row justify-content-between gap-4 align-items-start">
-            <div>
-              <span className="badge text-bg-light mb-3 hero-badge">
-                <FiEdit3 className="me-2" /> Products Editor
-              </span>
-              <h1 className="display-5 fw-semibold mb-2">Manage your product catalog</h1>
-              <p className="lead mb-0 text-body-secondary">
-                Build and maintain inventory records with a fast and modern editing workflow.
-              </p>
-            </div>
-            <div className="stats-card rounded-4 p-3 p-md-4">
-              <p className="text-uppercase small mb-1">Average price</p>
-              <h2 className="mb-3">${averagePrice.toFixed(2)}</h2>
-              <div className="d-flex align-items-center gap-2 text-success fw-medium">
-                <FiCheckCircle /> Data sourced from local storage
-              </div>
-            </div>
-          </div>
+          <ProductEditorHero averagePrice={averagePrice} />
         </motion.section>
 
         <motion.section
@@ -213,31 +198,7 @@ export function ProductEditorApp() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, delay: 0.1 }}
         >
-          <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
-            <h3 className="h4 mb-0 d-flex align-items-center gap-2">
-              <FiPackage /> List Products
-            </h3>
-            <div className="d-flex flex-column flex-sm-row gap-2 align-items-stretch">
-              <div className="input-group search-group">
-                <span className="input-group-text bg-white border-end-0">
-                  <FiSearch />
-                </span>
-                <input
-                  type="search"
-                  className="form-control border-start-0"
-                  placeholder="Search by name, description, unit"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                />
-              </div>
-              <button
-                className="btn btn-warning fw-semibold d-inline-flex align-items-center gap-2"
-                onClick={openAddDialog}
-              >
-                <FiPlus /> New Product
-              </button>
-            </div>
-          </div>
+          <ProductListToolbar search={search} onSearchChange={setSearch} onCreate={openAddDialog} />
 
           <div className="row g-3">
             <AnimatePresence>
