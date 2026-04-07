@@ -1,16 +1,16 @@
-import { useEffect, useMemo, useState } from 'react'
-import type { FormEvent } from 'react'
+import { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   FiCheckCircle,
+  FiEdit,
   FiEdit3,
   FiImage,
   FiPackage,
   FiPlus,
   FiSearch,
   FiTrash2,
+  FiX,
 } from 'react-icons/fi'
-import { ToastContainer, toast } from 'react-toastify'
 import './App.css'
 
 type Product = {
@@ -103,18 +103,15 @@ const loadProducts = (): Product[] => {
 }
 
 function App() {
-  const [products, setProducts] = useState<Product[]>(loadProducts)
+  const [products] = useState<Product[]>(loadProducts)
   const [search, setSearch] = useState('')
+  const [showAddModal, setShowAddModal] = useState(false)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [photo, setPhoto] = useState('')
   const [price, setPrice] = useState('')
   const [currency, setCurrency] = useState('USD')
   const [unit, setUnit] = useState('piece')
-
-  useEffect(() => {
-    window.localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(products))
-  }, [products])
 
   const averagePrice = useMemo(() => {
     if (!products.length) {
@@ -143,50 +140,6 @@ function App() {
     [products, search],
   )
 
-  const handleAddProduct = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-
-    const parsedPrice = Number(price)
-    const photoUrl = photo.trim()
-
-    let normalizedPhoto = ''
-
-    try {
-      normalizedPhoto = new URL(photoUrl).toString()
-    } catch {
-      toast.error('Please provide a valid product photo URL.')
-      return
-    }
-
-    if (!name.trim() || !description.trim() || !currency.trim() || !unit.trim() || parsedPrice <= 0) {
-      toast.error('Please provide valid product details before saving.')
-      return
-    }
-
-    const newProduct: Product = {
-      id: Date.now(),
-      name: name.trim(),
-      description: description.trim(),
-      photo: normalizedPhoto,
-      price: Number(parsedPrice.toFixed(2)),
-      currency: currency.trim().toUpperCase(),
-      unit: unit.trim().toLowerCase(),
-    }
-
-    setProducts((previous) => [newProduct, ...previous])
-    setName('')
-    setDescription('')
-    setPhoto('')
-    setPrice('')
-    setCurrency('USD')
-    setUnit('piece')
-    toast.success(`${newProduct.name} added to inventory.`)
-  }
-
-  const handleDeleteProduct = (id: number, productName: string) => {
-    setProducts((previous) => previous.filter((product) => product.id !== id))
-    toast.info(`${productName} removed.`)
-  }
 
   return (
     <div className="app-shell py-4 py-md-5">
@@ -211,30 +164,142 @@ function App() {
               <p className="text-uppercase small mb-1">Average price</p>
               <h2 className="mb-3">${averagePrice.toFixed(2)}</h2>
               <div className="d-flex align-items-center gap-2 text-success fw-medium">
-                <FiCheckCircle /> Live synced in local storage
+                <FiCheckCircle /> Data sourced from local storage
               </div>
             </div>
           </div>
         </motion.section>
 
-        <div className="row g-4 align-items-start">
-          <motion.section
-            className="col-12 col-lg-5"
-            initial={{ opacity: 0, x: -24 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
+        <motion.section
+          className="editor-card rounded-4 p-4 shadow-sm"
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, delay: 0.1 }}
+        >
+          <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+            <h3 className="h4 mb-0 d-flex align-items-center gap-2">
+              <FiPackage /> List Products
+            </h3>
+            <div className="d-flex flex-column flex-sm-row gap-2 align-items-stretch">
+              <div className="input-group search-group">
+                <span className="input-group-text bg-white border-end-0">
+                  <FiSearch />
+                </span>
+                <input
+                  type="search"
+                  className="form-control border-start-0"
+                  placeholder="Search by name, description, unit"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+              </div>
+              <button
+                className="btn btn-warning fw-semibold d-inline-flex align-items-center gap-2"
+                onClick={() => setShowAddModal(true)}
+              >
+                <FiPlus /> New Product
+              </button>
+            </div>
+          </div>
+
+          <div className="row g-3">
+            <AnimatePresence>
+              {filteredProducts.map((product, index) => (
+                <motion.div
+                  key={product.id}
+                  className="col-12 col-md-6 col-xl-4"
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -16 }}
+                  transition={{ duration: 0.25, delay: index * 0.03 }}
+                >
+                  <article className="product-item rounded-4 p-3 h-100 d-flex flex-column">
+                    <div className="product-image-wrapper rounded-3 overflow-hidden mb-3">
+                      <img
+                        src={product.photo}
+                        alt={product.name}
+                        className="product-image"
+                        onError={(event) => {
+                          const target = event.currentTarget
+                          target.onerror = null
+                          target.src = 'https://placehold.co/640x480/f2f2f2/666?text=Product+Image'
+                        }}
+                      />
+                    </div>
+
+                    <h4 className="h5 mb-1">{product.name}</h4>
+                    <p className="mb-3 text-body-secondary">{product.description}</p>
+                    <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+                      <span className="badge text-bg-light">
+                        {product.currency} {product.price.toFixed(2)}
+                      </span>
+                      <span className="badge text-bg-warning">Unit: {product.unit}</span>
+                    </div>
+
+                    <div className="d-flex gap-2 mt-auto justify-content-end">
+                      <button
+                        className="btn btn-sm btn-outline-secondary"
+                        type="button"
+                        aria-label="Edit product"
+                        title="Edit"
+                      >
+                        <FiEdit />
+                      </button>
+                      <button
+                        className="btn btn-sm btn-outline-danger"
+                        type="button"
+                        aria-label="Delete product"
+                        title="Delete"
+                      >
+                        <FiTrash2 />
+                      </button>
+                    </div>
+                  </article>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+
+            {!filteredProducts.length && (
+              <div className="col-12">
+                <div className="empty-state rounded-4 p-4 text-center text-body-secondary">
+                  <FiImage className="me-2" /> No products match your search.
+                </div>
+              </div>
+            )}
+          </div>
+        </motion.section>
+      </div>
+
+      <AnimatePresence>
+        {showAddModal && (
+          <motion.div
+            className="popup-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowAddModal(false)}
           >
-            <div className="editor-card rounded-4 p-4 shadow-sm h-100">
-              <h3 className="h4 mb-3 d-flex align-items-center gap-2">
-                <FiPlus /> Add Product
-              </h3>
-              <form onSubmit={handleAddProduct} className="d-grid gap-3">
+            <motion.section
+              className="popup-card rounded-4 p-4"
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.2 }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <h4 className="h5 mb-0">Add Product (Popup)</h4>
+                <button className="btn btn-sm btn-light" onClick={() => setShowAddModal(false)}>
+                  <FiX />
+                </button>
+              </div>
+
+              <form className="d-grid gap-3">
                 <div>
                   <label className="form-label">Product name</label>
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="UltraWide Monitor"
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                   />
@@ -244,7 +309,6 @@ function App() {
                   <textarea
                     className="form-control"
                     rows={3}
-                    placeholder="Short product details"
                     value={description}
                     onChange={(event) => setDescription(event.target.value)}
                   />
@@ -254,133 +318,47 @@ function App() {
                   <input
                     type="url"
                     className="form-control"
-                    placeholder="https://example.com/image.jpg"
                     value={photo}
                     onChange={(event) => setPhoto(event.target.value)}
                   />
                 </div>
                 <div className="row g-3">
-                  <div className="col-6">
+                  <div className="col-4">
                     <label className="form-label">Price</label>
                     <input
                       type="number"
-                      min="0"
-                      step="0.01"
                       className="form-control"
-                      placeholder="0.00"
                       value={price}
                       onChange={(event) => setPrice(event.target.value)}
                     />
                   </div>
-                  <div className="col-6">
+                  <div className="col-4">
                     <label className="form-label">Currency</label>
                     <input
                       type="text"
                       className="form-control"
-                      placeholder="USD"
                       value={currency}
                       onChange={(event) => setCurrency(event.target.value)}
                     />
                   </div>
+                  <div className="col-4">
+                    <label className="form-label">Unit</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={unit}
+                      onChange={(event) => setUnit(event.target.value)}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="form-label">Unit</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="piece / set / kg"
-                    value={unit}
-                    onChange={(event) => setUnit(event.target.value)}
-                  />
-                </div>
-                <button type="submit" className="btn btn-warning fw-semibold py-2">
-                  Save Product
+                <button type="button" className="btn btn-warning fw-semibold" disabled>
+                  Save Product (Coming Soon)
                 </button>
               </form>
-            </div>
-          </motion.section>
-
-          <motion.section
-            className="col-12 col-lg-7"
-            initial={{ opacity: 0, x: 24 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-          >
-            <div className="editor-card rounded-4 p-4 shadow-sm">
-              <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
-                <h3 className="h4 mb-0 d-flex align-items-center gap-2">
-                  <FiPackage /> Product List
-                </h3>
-                <div className="input-group search-group">
-                  <span className="input-group-text bg-white border-end-0">
-                    <FiSearch />
-                  </span>
-                  <input
-                    type="search"
-                    className="form-control border-start-0"
-                    placeholder="Search by name, description, unit"
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="d-grid gap-3">
-                <AnimatePresence>
-                  {filteredProducts.map((product, index) => (
-                    <motion.article
-                      key={product.id}
-                      className="product-item rounded-4 p-3"
-                      initial={{ opacity: 0, y: 16 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -16 }}
-                      transition={{ duration: 0.25, delay: index * 0.04 }}
-                    >
-                      <div className="d-flex flex-column flex-sm-row gap-3">
-                        <div className="product-image-wrapper rounded-3 overflow-hidden">
-                          <img
-                            src={product.photo}
-                            alt={product.name}
-                            className="product-image"
-                            onError={(event) => {
-                              const target = event.currentTarget
-                              target.onerror = null
-                              target.src = 'https://placehold.co/640x480/f2f2f2/666?text=Product+Image'
-                            }}
-                          />
-                        </div>
-                        <div className="flex-grow-1 d-flex flex-column">
-                          <h4 className="h5 mb-1">{product.name}</h4>
-                          <p className="mb-3 text-body-secondary">{product.description}</p>
-                          <div className="d-flex flex-wrap align-items-center gap-2 mt-auto">
-                            <span className="badge text-bg-light">
-                              {product.currency} {product.price.toFixed(2)}
-                            </span>
-                            <span className="badge text-bg-warning">Unit: {product.unit}</span>
-                            <button
-                              className="btn btn-sm btn-outline-danger ms-sm-auto"
-                              onClick={() => handleDeleteProduct(product.id, product.name)}
-                            >
-                              <FiTrash2 />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </motion.article>
-                  ))}
-                </AnimatePresence>
-
-                {!filteredProducts.length && (
-                  <div className="empty-state rounded-4 p-4 text-center text-body-secondary">
-                    <FiImage className="me-2" /> No products match your search.
-                  </div>
-                )}
-              </div>
-            </div>
-          </motion.section>
-        </div>
-      </div>
-      <ToastContainer position="bottom-right" autoClose={2200} theme="colored" />
+            </motion.section>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
