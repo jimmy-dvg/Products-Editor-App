@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   FiCheckCircle,
@@ -103,15 +103,106 @@ const loadProducts = (): Product[] => {
 }
 
 function App() {
-  const [products] = useState<Product[]>(loadProducts)
+  const [products, setProducts] = useState<Product[]>(loadProducts)
   const [search, setSearch] = useState('')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [editingProductId, setEditingProductId] = useState<number | null>(null)
+  const [deletingProduct, setDeletingProduct] = useState<Product | null>(null)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [photo, setPhoto] = useState('')
   const [price, setPrice] = useState('')
   const [currency, setCurrency] = useState('USD')
   const [unit, setUnit] = useState('piece')
+
+  useEffect(() => {
+    window.localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(products))
+  }, [products])
+
+  const resetForm = () => {
+    setName('')
+    setDescription('')
+    setPhoto('')
+    setPrice('')
+    setCurrency('USD')
+    setUnit('piece')
+  }
+
+  const openAddDialog = () => {
+    resetForm()
+    setEditingProductId(null)
+    setShowAddModal(true)
+  }
+
+  const openEditDialog = (product: Product) => {
+    setEditingProductId(product.id)
+    setName(product.name)
+    setDescription(product.description)
+    setPhoto(product.photo)
+    setPrice(String(product.price))
+    setCurrency(product.currency)
+    setUnit(product.unit)
+    setShowAddModal(true)
+  }
+
+  const closeFormDialog = () => {
+    setShowAddModal(false)
+    setEditingProductId(null)
+  }
+
+  const submitProductForm = () => {
+    const parsedPrice = Number(price)
+
+    if (
+      !name.trim() ||
+      !description.trim() ||
+      !photo.trim() ||
+      !currency.trim() ||
+      !unit.trim() ||
+      !Number.isFinite(parsedPrice) ||
+      parsedPrice <= 0
+    ) {
+      return
+    }
+
+    let normalizedPhoto = ''
+
+    try {
+      normalizedPhoto = new URL(photo.trim()).toString()
+    } catch {
+      return
+    }
+
+    const payload: Product = {
+      id: editingProductId ?? Date.now(),
+      name: name.trim(),
+      description: description.trim(),
+      photo: normalizedPhoto,
+      price: Number(parsedPrice.toFixed(2)),
+      currency: currency.trim().toUpperCase(),
+      unit: unit.trim().toLowerCase(),
+    }
+
+    if (editingProductId === null) {
+      setProducts((previous) => [payload, ...previous])
+    } else {
+      setProducts((previous) =>
+        previous.map((product) => (product.id === editingProductId ? payload : product)),
+      )
+    }
+
+    closeFormDialog()
+    resetForm()
+  }
+
+  const confirmDelete = () => {
+    if (!deletingProduct) {
+      return
+    }
+
+    setProducts((previous) => previous.filter((product) => product.id !== deletingProduct.id))
+    setDeletingProduct(null)
+  }
 
   const averagePrice = useMemo(() => {
     if (!products.length) {
@@ -195,7 +286,7 @@ function App() {
               </div>
               <button
                 className="btn btn-warning fw-semibold d-inline-flex align-items-center gap-2"
-                onClick={() => setShowAddModal(true)}
+                onClick={openAddDialog}
               >
                 <FiPlus /> New Product
               </button>
@@ -242,6 +333,7 @@ function App() {
                         type="button"
                         aria-label="Edit product"
                         title="Edit"
+                        onClick={() => openEditDialog(product)}
                       >
                         <FiEdit />
                       </button>
@@ -250,6 +342,7 @@ function App() {
                         type="button"
                         aria-label="Delete product"
                         title="Delete"
+                        onClick={() => setDeletingProduct(product)}
                       >
                         <FiTrash2 />
                       </button>
@@ -288,13 +381,19 @@ function App() {
               onClick={(event) => event.stopPropagation()}
             >
               <div className="d-flex justify-content-between align-items-center mb-3">
-                <h4 className="h5 mb-0">Add Product (Popup)</h4>
-                <button className="btn btn-sm btn-light" onClick={() => setShowAddModal(false)}>
+                <h4 className="h5 mb-0">{editingProductId === null ? 'New Product' : 'Edit Product'}</h4>
+                <button className="btn btn-sm btn-light" onClick={closeFormDialog}>
                   <FiX />
                 </button>
               </div>
 
-              <form className="d-grid gap-3">
+              <form
+                className="d-grid gap-3"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  submitProductForm()
+                }}
+              >
                 <div>
                   <label className="form-label">Product name</label>
                   <input
@@ -327,6 +426,8 @@ function App() {
                     <label className="form-label">Price</label>
                     <input
                       type="number"
+                      min="0"
+                      step="0.01"
                       className="form-control"
                       value={price}
                       onChange={(event) => setPrice(event.target.value)}
@@ -337,6 +438,7 @@ function App() {
                     <input
                       type="text"
                       className="form-control"
+                      maxLength={3}
                       value={currency}
                       onChange={(event) => setCurrency(event.target.value)}
                     />
@@ -351,10 +453,44 @@ function App() {
                     />
                   </div>
                 </div>
-                <button type="button" className="btn btn-warning fw-semibold" disabled>
-                  Save Product (Coming Soon)
+                <button type="submit" className="btn btn-warning fw-semibold">
+                  {editingProductId === null ? 'Create Product' : 'Save Changes'}
                 </button>
               </form>
+            </motion.section>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {deletingProduct && (
+          <motion.div
+            className="popup-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setDeletingProduct(null)}
+          >
+            <motion.section
+              className="popup-card rounded-4 p-4"
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.2 }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <h4 className="h5 mb-2">Confirm Delete</h4>
+              <p className="text-body-secondary mb-4">
+                Are you sure you want to delete <strong>{deletingProduct.name}</strong>?
+              </p>
+              <div className="d-flex justify-content-end gap-2">
+                <button className="btn btn-light" onClick={() => setDeletingProduct(null)}>
+                  Cancel
+                </button>
+                <button className="btn btn-danger" onClick={confirmDelete}>
+                  Delete
+                </button>
+              </div>
             </motion.section>
           </motion.div>
         )}
