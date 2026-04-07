@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import type { ChangeEvent } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   FiCheckCircle,
@@ -102,6 +103,14 @@ const loadProducts = (): Product[] => {
   return sampleProducts
 }
 
+const fileToDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result ?? ''))
+    reader.onerror = () => reject(new Error('Failed to read file'))
+    reader.readAsDataURL(file)
+  })
+
 function App() {
   const [products, setProducts] = useState<Product[]>(loadProducts)
   const [search, setSearch] = useState('')
@@ -110,7 +119,9 @@ function App() {
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [photo, setPhoto] = useState('')
+  const [imageSource, setImageSource] = useState<'url' | 'upload'>('url')
+  const [photoUrl, setPhotoUrl] = useState('')
+  const [uploadedImageDataUrl, setUploadedImageDataUrl] = useState('')
   const [price, setPrice] = useState('')
   const [currency, setCurrency] = useState('USD')
   const [unit, setUnit] = useState('piece')
@@ -122,7 +133,9 @@ function App() {
   const resetForm = () => {
     setName('')
     setDescription('')
-    setPhoto('')
+    setImageSource('url')
+    setPhotoUrl('')
+    setUploadedImageDataUrl('')
     setPrice('')
     setCurrency('USD')
     setUnit('piece')
@@ -138,7 +151,17 @@ function App() {
     setEditingProductId(product.id)
     setName(product.name)
     setDescription(product.description)
-    setPhoto(product.photo)
+
+    if (product.photo.startsWith('data:image/')) {
+      setImageSource('upload')
+      setUploadedImageDataUrl(product.photo)
+      setPhotoUrl('')
+    } else {
+      setImageSource('url')
+      setPhotoUrl(product.photo)
+      setUploadedImageDataUrl('')
+    }
+
     setPrice(String(product.price))
     setCurrency(product.currency)
     setUnit(product.unit)
@@ -156,7 +179,6 @@ function App() {
     if (
       !name.trim() ||
       !description.trim() ||
-      !photo.trim() ||
       !currency.trim() ||
       !unit.trim() ||
       !Number.isFinite(parsedPrice) ||
@@ -167,10 +189,18 @@ function App() {
 
     let normalizedPhoto = ''
 
-    try {
-      normalizedPhoto = new URL(photo.trim()).toString()
-    } catch {
-      return
+    if (imageSource === 'url') {
+      try {
+        normalizedPhoto = new URL(photoUrl.trim()).toString()
+      } catch {
+        return
+      }
+    } else {
+      if (!uploadedImageDataUrl.startsWith('data:image/')) {
+        return
+      }
+
+      normalizedPhoto = uploadedImageDataUrl
     }
 
     const payload: Product = {
@@ -202,6 +232,18 @@ function App() {
 
     setProducts((previous) => previous.filter((product) => product.id !== deletingProduct.id))
     setDeletingProduct(null)
+  }
+
+  const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+
+    if (!file || !file.type.startsWith('image/')) {
+      return
+    }
+
+    const dataUrl = await fileToDataUrl(file)
+    setUploadedImageDataUrl(dataUrl)
+    event.target.value = ''
   }
 
   const averagePrice = useMemo(() => {
@@ -414,12 +456,46 @@ function App() {
                 </div>
                 <div>
                   <label className="form-label">Photo URL</label>
-                  <input
-                    type="url"
-                    className="form-control"
-                    value={photo}
-                    onChange={(event) => setPhoto(event.target.value)}
-                  />
+                  <div className="d-flex gap-2 mb-2">
+                    <button
+                      type="button"
+                      className={`btn btn-sm ${imageSource === 'url' ? 'btn-dark' : 'btn-outline-dark'}`}
+                      onClick={() => setImageSource('url')}
+                    >
+                      Image URL
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn btn-sm ${imageSource === 'upload' ? 'btn-dark' : 'btn-outline-dark'}`}
+                      onClick={() => setImageSource('upload')}
+                    >
+                      Upload Image
+                    </button>
+                  </div>
+
+                  {imageSource === 'url' ? (
+                    <input
+                      type="url"
+                      className="form-control"
+                      placeholder="https://example.com/image.jpg"
+                      value={photoUrl}
+                      onChange={(event) => setPhotoUrl(event.target.value)}
+                    />
+                  ) : (
+                    <div className="d-grid gap-2">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="form-control"
+                        onChange={handleImageUpload}
+                      />
+                      {uploadedImageDataUrl && (
+                        <div className="upload-preview rounded-3 overflow-hidden">
+                          <img src={uploadedImageDataUrl} alt="Uploaded preview" className="product-image" />
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="row g-3">
                   <div className="col-4">

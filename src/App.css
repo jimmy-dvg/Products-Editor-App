@@ -83,6 +83,12 @@
   box-shadow: 0 35px 65px rgba(12, 41, 77, 0.32);
 }
 
+.upload-preview {
+  border: 1px solid rgba(12, 41, 77, 0.12);
+  height: 160px;
+  background: #eef3fb;
+}
+
 @media (max-width: 991px) {
   .search-group {
     max-width: 100%;
